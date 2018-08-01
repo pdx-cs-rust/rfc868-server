@@ -19,7 +19,7 @@ fn main() -> io::Result<()> {
         let mut stream = stream?;
         let mut now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("time went backward")
+            .expect("cannot get time since epoch")
             .as_secs() as u32;
         // XXX Adjust time since 1970 to produce time since 1900.
         now += 2_208_988_800;
