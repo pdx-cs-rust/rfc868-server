@@ -4,26 +4,26 @@
 //! compliant time server.
 
 extern crate byteorder;
+extern crate chrono;
+
 use byteorder::{BigEndian, WriteBytesExt};
+use chrono::naive;
 
 use std::io;
 use std::net::TcpListener;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Process time requests.
 fn main() -> io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:37").unwrap();
+    let epoch = naive::NaiveDate::from_ymd(1900, 1, 1)
+        .and_hms(0, 0, 0)
+        .timestamp();
 
     // accept connections and process them serially
     for stream in listener.incoming() {
         let mut stream = stream?;
-        let mut now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("cannot get time since epoch")
-            .as_secs() as u32;
-        // XXX Adjust time since 1970 to produce time since 1900.
-        now += 2_208_988_800;
-        stream.write_u32::<BigEndian>(now)?;
+        let mut now = chrono::Utc::now().timestamp() - epoch;
+        stream.write_u32::<BigEndian>(now as u32)?;
     }
     Ok(())    
 }
