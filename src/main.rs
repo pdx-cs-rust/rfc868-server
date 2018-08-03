@@ -15,6 +15,12 @@ use chrono::naive;
 
 use std::{net, thread};
 
+/// Return the current time in seconds as an offset from the
+/// RFC 868 epoch.
+fn get_now(epoch: i64) -> i32 {
+    (chrono::Utc::now().timestamp() - epoch) as i32
+}
+
 /// Process TCP time requests.
 fn tcp_handler(epoch: i64) {
     let listener = net::TcpListener::bind("127.0.0.1:37").unwrap();
@@ -23,7 +29,7 @@ fn tcp_handler(epoch: i64) {
     for stream in listener.incoming() {
         let mut stream = stream
             .expect("could not start stream");
-        let now = chrono::Utc::now().timestamp() - epoch;
+        let now = get_now(epoch);
         stream.write_u32::<BigEndian>(now as u32)
             .expect("could not write to stream");
     }
@@ -37,7 +43,7 @@ fn udp_handler(epoch: i64) {
         let (amt, src) = socket.recv_from(&mut buf)
             .expect("bad request packet");
         assert_eq!(amt, 0);
-        let now = chrono::Utc::now().timestamp() - epoch;
+        let now = get_now(epoch);
         let mut buf: Vec<u8> = Vec::with_capacity(4);
         buf.write_u32::<BigEndian>(now as u32)
             .expect("could not create packet");
