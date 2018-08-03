@@ -6,3 +6,4 @@ authors = ["Bart Massey <bart@cs.pdx.edu>"]
 [dependencies]
 chrono = "0.4"
 byteorder = "1.2"
+lazy_static = "*"
