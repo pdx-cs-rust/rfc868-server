@@ -30,9 +30,14 @@ macro_rules! try_log {
 }
 
 /// Return the current time in seconds as an offset from the
-/// RFC 868 epoch.
-fn get_now(epoch: i64) -> i32 {
-    (chrono::Utc::now().timestamp() - epoch) as i32
+/// RFC 868 epoch. Note the RFC 868 erratum, which says that
+/// the time is actually a `u32`.
+fn get_now(epoch: i64) -> Result<u32, &'static str> {
+    let now: i64 = chrono::Utc::now().timestamp() - epoch;
+    if now < 0 || now > u32::max_value() as i64 {
+        return Err("timestamp out of range");
+    }
+    Ok(now as u32)
 }
 
 /// Process TCP time requests.
@@ -44,7 +49,8 @@ fn tcp_handler(epoch: i64) -> ! {
         let stream = listener.accept();
         let (mut stream, _) = try_log!(stream, "could not start stream");
         let now = get_now(epoch);
-        let r = stream.write_u32::<BigEndian>(now as u32);
+        let now = try_log!(now, "current time past end of epoch");
+        let r = stream.write_u32::<BigEndian>(now);
         try_log!(r, "could not write to stream");
     }
 }
@@ -60,8 +66,9 @@ fn udp_handler(epoch: i64) -> ! {
             eprintln!("invalid data in request packet");
         }
         let now = get_now(epoch);
+        let now = try_log!(now, "current time past end of epoch");
         let mut buf: Vec<u8> = Vec::with_capacity(4);
-        buf.write_i32::<BigEndian>(now)
+        buf.write_u32::<BigEndian>(now)
             .expect("could not create packet");
         let r = socket.send_to(&mut buf, &src);
         try_log!(r, "could not send packet");
@@ -73,8 +80,7 @@ fn main() {
         .and_hms(0, 0, 0)
         .timestamp();
     let tcp = thread::spawn(move || tcp_handler(epoch));
-    let udp = thread::spawn(move || udp_handler(epoch));
-    tcp.join().expect("tcp thread failed");
-    udp.join().expect("udp thread failed");
-    panic!("children exited");
+    let _ = thread::spawn(move || udp_handler(epoch));
+    tcp.join().unwrap();
+    panic!("child exited");
 }
